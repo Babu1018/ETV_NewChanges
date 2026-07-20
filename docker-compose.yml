@@ -1,0 +1,81 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-etv}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-etv}
+      POSTGRES_DB: ${POSTGRES_DB:-ETV}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-etv} -d ${POSTGRES_DB:-ETV}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./back_end
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - back_end/.env
+    environment:
+      # Override local Postgres URL from back_end/.env — in Docker the host is the db service.
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-etv}:${POSTGRES_PASSWORD:-etv}@db:5432/${POSTGRES_DB:-ETV}
+      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:-change-me-etv-jwt-secret}
+      AUTH_TOKEN_HOURS: ${AUTH_TOKEN_HOURS:-24}
+      HF_HUB_DISABLE_SYMLINKS: "1"
+      HF_HUB_DISABLE_SYMLINKS_WARNING: "1"
+      # HF_TOKEN comes from env_file (back_end/.env). Do not override here with
+      # ${HF_TOKEN:-} — Compose substitutes from the project .env only and would
+      # blank out the token even when it is set in back_end/.env.
+    volumes:
+      - huggingface_cache:/home/appuser/.cache/huggingface
+      # Named volume by default (appuser can write). For host log files on Linux deploy:
+      #   - /var/www/html/ETV/back_end/logs:/app/logs
+      # then: sudo chown -R 1001:1001 /var/www/html/ETV/back_end/logs
+      - ./back_end/logs:/app/logs
+    networks:
+      - internal
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    ports:
+      - "127.0.0.1:8037:8000"
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VITE_API_AUTH_KEY: ${VITE_API_AUTH_KEY:-X4q9n86kgymx}
+        VITE_ASR_API_BASE_URL: /asr
+        VITE_TTS_API_BASE_URL: /tts
+        VITE_AUTH_API_BASE_URL: /api
+    restart: unless-stopped
+    networks:
+      - internal
+    ports:
+      - "127.0.0.1:8036:8080"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  huggingface_cache:
+  backend_logs:
+
+networks:
+  internal:
+    driver: bridge
