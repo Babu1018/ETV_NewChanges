@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { Spinner } from "react-bootstrap";
-import { audioMimeType, normalizeAudioFormat } from "../utils/audioFormat.js";
+import WaveformInlinePlayer from "./WaveformInlinePlayer.jsx";
 import { sanitizeUserMessage } from "../utils/apiError.js";
 import { getAuthToken } from "../utils/authSession.js";
 import { LONG_REQUEST_MS } from "../utils/fetchWithTimeout.js";
 
 /**
  * Inline audio player for ASR/TTS History "Listen Input" cells.
- * Loads audio with a fresh JWT and a long timeout for large uploads.
+ * Loads audio with a fresh JWT and a long timeout for large uploads,
+ * rendering real visual audio waveforms using WaveSurfer.
  */
 export default function HistoryAudioPlayer({
   apiBaseUrl,
@@ -105,20 +106,10 @@ export default function HistoryAudioPlayer({
     return (
       <span className="history-audio-loading">
         <Spinner animation="border" size="sm" />
-        Loading…
+        Loading audio…
       </span>
     );
   }
 
-  const mime = mimeType || audioMimeType(normalizeAudioFormat(audioFormat));
-  return (
-    <audio
-      className="history-audio-player"
-      controls
-      preload="metadata"
-      src={src}
-    >
-      <source src={src} type={mime} />
-    </audio>
-  );
+  return <WaveformInlinePlayer src={src} className="history-audio-player" />;
 }

@@ -83,7 +83,14 @@ function SaveAudioModal({ open, fileName, saving, onFileNameChange, onClose, onS
   if (!open) return null;
 
   return (
-    <div className="studio-save-backdrop" role="presentation" onClick={onClose}>
+    <div
+      className="studio-save-backdrop"
+      role="presentation"
+      onClick={(e) => {
+        e.stopPropagation();
+        onClose?.();
+      }}
+    >
       <div
         className="studio-save-modal"
         role="dialog"

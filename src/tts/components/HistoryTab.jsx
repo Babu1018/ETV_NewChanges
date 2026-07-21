@@ -293,7 +293,14 @@ function HistoryConfirmModal({
   if (!open) return null;
 
   return (
-    <div className="studio-save-backdrop" role="presentation" onClick={busy ? undefined : onClose}>
+    <div
+      className="studio-save-backdrop"
+      role="presentation"
+      onClick={(e) => {
+        e.stopPropagation();
+        if (!busy) onClose?.();
+      }}
+    >
       <div
         className="studio-save-modal history-confirm-modal"
         role="dialog"
@@ -342,7 +349,14 @@ function HistoryScriptModal({ open, title, script, fileName, onClose }) {
   if (!open) return null;
 
   return (
-    <div className="studio-save-backdrop" role="presentation" onClick={onClose}>
+    <div
+      className="studio-save-backdrop"
+      role="presentation"
+      onClick={(e) => {
+        e.stopPropagation();
+        onClose?.();
+      }}
+    >
       <div
         className="studio-save-modal history-script-modal"
         role="dialog"
@@ -351,17 +365,13 @@ function HistoryScriptModal({ open, title, script, fileName, onClose }) {
         onClick={(e) => e.stopPropagation()}
       >
         <header className="studio-save-head history-script-modal-head">
-          <h3 id="history-script-modal-title" className="studio-save-title">
-            {title}
-          </h3>
+          <div>
+            <p className="logs-script-modal-kicker">SCRIPT</p>
+            <h3 id="history-script-modal-title" className="studio-save-title">
+              {title}
+            </h3>
+          </div>
           <div className="history-script-modal-actions">
-            <button
-              type="button"
-              className="history-script-download-btn"
-              onClick={() => downloadScriptText(script, fileName)}
-            >
-              Download script
-            </button>
             <button
               type="button"
               className="studio-save-close"
@@ -395,7 +405,10 @@ function HistoryPreviewCell({ item, disabled, onViewMore }) {
             type="button"
             className="history-view-more"
             disabled={disabled}
-            onClick={() => onViewMore(item)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onViewMore(item);
+            }}
           >
             View more
           </button>

@@ -3064,14 +3064,15 @@ code {
   min-height: 0;
   max-height: 100%;
   border-radius: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.35);
+  border: 1px solid #c7d9fb;
   overflow: hidden;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65);
-  background: #d9d9d9e6;
+  background: #ffffff;
 }
 
 .studio-preview-shell:has(.studio-preview-audio) {
-  background: #ffffffe6;
+  background: #ffffff;
+  border-color: #c7d9fb;
 }
 
 /* Timeline: ticks + labels sit under a frosted veil (mockup: recessed into panel) */
@@ -3080,7 +3081,8 @@ code {
   flex-shrink: 0;
   height: 46px;
   overflow: hidden;
-  background: #ffffffeb;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
 }
 
 .studio-timeline-etched {
@@ -3100,13 +3102,13 @@ code {
   inset: 0;
   z-index: 1;
   pointer-events: none;
-  background: #D9D9D9E6;
+  background: rgba(248, 250, 252, 0.85);
   border-radius: 18px 18px 0 0;
 }
 
 .studio-timeline-stack--live {
   cursor: pointer;
-  background: #ffffffeb;
+  background: #f8fafc;
   border-radius: 18px 18px 0 0;
 }
 
@@ -3398,7 +3400,7 @@ code {
   flex: 1;
   overflow: hidden;
   gap: 0;
-  background: #ffffffe6;
+  background: transparent;
 }
 
 .studio-save-backdrop {
@@ -4159,8 +4161,65 @@ code {
 .history-audio-player {
   width: 100%;
   max-width: 320px;
-  height: 36px;
+}
+
+.history-waveform-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  max-width: 280px;
+  height: 38px;
+  padding: 0 0.5rem;
   border-radius: 999px;
+  background: transparent;
+  box-sizing: border-box;
+}
+
+.history-waveform-play-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: #18181b;
+  color: #ffffff;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform 0.12s, background 0.12s;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.history-waveform-play-btn:hover:not(:disabled) {
+  background: #000000;
+  transform: scale(1.06);
+}
+
+.history-waveform-play-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.history-waveform-track {
+  flex: 1;
+  min-width: 80px;
+  height: 32px;
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.history-waveform-time {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #64748b;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .history-audio-loading {

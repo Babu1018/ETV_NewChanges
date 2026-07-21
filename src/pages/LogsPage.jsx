@@ -4,6 +4,7 @@ import { Container } from "react-bootstrap";
 import AdminNavActions from "../components/AdminNavActions.jsx";
 import StudioProfileMenu from "../components/StudioProfileMenu.jsx";
 import StudioBreadcrumb from "../components/StudioBreadcrumb.jsx";
+import WaveformInlinePlayer from "../components/WaveformInlinePlayer.jsx";
 import { joinAuthUrl } from "../components/auth/authApi.js";
 import { audioMimeType, normalizeAudioFormat } from "../utils/audioFormat.js";
 import { readApiError, sanitizeUserMessage } from "../utils/apiError.js";
@@ -369,9 +370,7 @@ function LogAudioCell({ entry, onDownload, downloadingId }) {
   const mime = entry.mimeType || audioMimeType(normalizeAudioFormat(entry.audioFormat));
   return (
     <div className="logs-audio-cell" ref={rootRef} style={{ position: "relative" }}>
-      <audio className="logs-inline-audio" controls preload="metadata" src={src}>
-        <source src={src} type={mime} />
-      </audio>
+      <WaveformInlinePlayer src={src} className="logs-inline-audio" />
       <button
         type="button"
         className="logs-download-btn"
@@ -600,7 +599,7 @@ function LogEditCorrectionAudio({ entry, audioId, fileName, label = "Audio" }) {
   return (
     <div className="logs-edit-correction-audio">
       <span className="logs-edit-correction-label">{fileName || label}</span>
-      <audio className="logs-inline-audio logs-inline-audio--correction" controls preload="metadata" src={src} />
+      <WaveformInlinePlayer src={src} className="logs-inline-audio logs-inline-audio--correction" />
     </div>
   );
 }

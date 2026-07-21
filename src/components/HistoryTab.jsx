@@ -153,11 +153,15 @@ function downloadTranscriptText(item) {
 }
 
 function ModalBackdrop({ onClose, children }) {
+  const handleClick = (e) => {
+    e.stopPropagation();
+    onClose?.();
+  };
   if (!onClose) {
     return <div className="studio-save-backdrop">{children}</div>;
   }
   return (
-    <div className="studio-save-backdrop" role="presentation" onClick={onClose}>
+    <div className="studio-save-backdrop" role="presentation" onClick={handleClick}>
       {children}
     </div>
   );
@@ -174,24 +178,20 @@ function PreviewModal({ item, diff, onClose }) {
   return (
     <ModalBackdrop onClose={onClose}>
       <div
-        className="history-preview-modal"
+        className="studio-save-modal history-script-modal history-preview-modal"
         role="dialog"
         aria-modal="true"
         aria-labelledby="history-preview-title"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="studio-save-head">
-          <h2 id="history-preview-title" className="studio-save-title">
-            {title}
-          </h2>
-          <div className="studio-save-head-actions">
-            <button
-              type="button"
-              className="history-toolbar-btn history-toolbar-btn--primary"
-              onClick={() => downloadTranscriptText(item)}
-            >
-              Download
-            </button>
+        <header className="studio-save-head history-script-modal-head">
+          <div>
+            <p className="logs-script-modal-kicker">TRANSCRIPT</p>
+            <h3 id="history-preview-title" className="studio-save-title">
+              {title}
+            </h3>
+          </div>
+          <div className="history-script-modal-actions">
             <button
               type="button"
               className="studio-save-close"
@@ -201,8 +201,8 @@ function PreviewModal({ item, diff, onClose }) {
               ×
             </button>
           </div>
-        </div>
-        <div className="history-preview-body">{body}</div>
+        </header>
+        <div className="history-script-modal-body history-preview-body">{body}</div>
       </div>
     </ModalBackdrop>
   );
@@ -519,7 +519,10 @@ export default function HistoryTab({
                           <button
                             type="button"
                             className="history-view-more"
-                            onClick={() => setPreviewItem(item)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setPreviewItem(item);
+                            }}
                           >
                             View more
                           </button>

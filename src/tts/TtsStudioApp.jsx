@@ -161,11 +161,17 @@ export default function TtsStudioApp({ onSignOut, onBackToHub }) {
 
   const handleOuterClick = (e) => {
     if (
+      !e.target.isConnected ||
       e.target.closest(".studio-card") ||
       e.target.closest(".studio-nav") ||
+      e.target.closest(".history-section") ||
+      e.target.closest(".history-tab") ||
       e.target.closest(".modal") ||
       e.target.closest(".studio-save-modal") ||
       e.target.closest(".studio-save-backdrop") ||
+      e.target.closest(".history-script-modal") ||
+      e.target.closest(".history-preview-modal") ||
+      e.target.closest(".history-confirm-modal") ||
       e.target.closest(".studio-select-menu") ||
       e.target.closest(".dropdown-menu") ||
       e.target.closest(".studio-profile-menu") ||
