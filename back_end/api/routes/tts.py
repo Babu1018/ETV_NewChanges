@@ -564,7 +564,16 @@ async def correct_tts(
         )
         sarvam_client = get_sarvam_client(resolved_sarvam_key)
 
-        # 1. Transcribe validator correction (Saaras v3)
+        # 1. Check correction audio duration before transcribing
+        corr_check_seg = AudioSegment.from_file(correction_path)
+        corr_dur_sec = len(corr_check_seg) / 1000.0
+        if corr_dur_sec > 30.0:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Correction audio duration is {corr_dur_sec:.1f} seconds, which exceeds Sarvam AI's 30-second limit. Please record or upload a shorter clip (30s max).",
+            )
+
+        # Transcribe validator correction (Saaras v3)
         with open(correction_path, "rb") as f:
             asr_response = sarvam_client.speech_to_text.transcribe(
                 file=f,
@@ -649,7 +658,10 @@ async def correct_tts(
                     "then restart the backend."
                 ),
             )
-        raise HTTPException(status_code=500, detail=err)
+        import re
+        match = re.search(r"['\"]message['\"]\s*:\s*['\"]([^'\"]+)['\"]", err)
+        clean_detail = match.group(1) if match else err
+        raise HTTPException(status_code=400 if "30 seconds" in err or "limit" in err else 500, detail=clean_detail)
 
 
 @router.post("/delete-clip")

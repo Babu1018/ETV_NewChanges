@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import WaveSurfer from "wavesurfer.js";
 import { formatTimeShort } from "../utils/waveform.js";
 
 function IconPlay() {
@@ -22,81 +21,90 @@ export default function WaveformInlinePlayer({
   src,
   blob,
   height = 32,
-  waveColor = "#a3a3a3",
-  progressColor = "#18181b",
+  waveColor = "#64748b",
+  progressColor = "#2563eb",
   className = "",
   showTime = true,
 }) {
-  const containerRef = useRef(null);
-  const wavesurferRef = useRef(null);
+  const audioRef = useRef(null);
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [ready, setReady] = useState(false);
+  const [audioUrl, setAudioUrl] = useState(null);
 
   useEffect(() => {
-    if (!containerRef.current) return undefined;
+    let url = null;
+    if (blob) {
+      url = URL.createObjectURL(blob);
+    } else if (src) {
+      url = src;
+    }
 
-    const ws = WaveSurfer.create({
-      container: containerRef.current,
-      height,
-      waveColor,
-      progressColor,
-      cursorColor: "transparent",
-      cursorWidth: 0,
-      barWidth: 3,
-      barGap: 3,
-      barRadius: 3,
-      normalize: true,
-      dragToSeek: true,
-      interact: true,
-    });
-
-    wavesurferRef.current = ws;
-
-    ws.on("ready", () => {
-      setDuration(ws.getDuration());
-      setReady(true);
-    });
-    ws.on("timeupdate", (t) => setCurrentTime(t));
-    ws.on("play", () => setPlaying(true));
-    ws.on("pause", () => setPlaying(false));
-    ws.on("finish", () => {
-      setPlaying(false);
-      setCurrentTime(0);
-    });
-
-    return () => {
-      ws.destroy();
-      wavesurferRef.current = null;
-      setReady(false);
-    };
-  }, [height, waveColor, progressColor]);
-
-  useEffect(() => {
-    const ws = wavesurferRef.current;
-    if (!ws) return;
-
+    setAudioUrl(url);
     setReady(false);
     setPlaying(false);
     setCurrentTime(0);
     setDuration(0);
 
-    if (blob) {
-      void ws.loadBlob(blob);
-    } else if (src) {
-      void ws.load(src);
-    }
+    return () => {
+      if (blob && url) {
+        URL.revokeObjectURL(url);
+      }
+    };
   }, [src, blob]);
 
   const togglePlay = () => {
-    const ws = wavesurferRef.current;
-    if (!ws || !ready) return;
-    ws.playPause();
+    const audio = audioRef.current;
+    if (!audio || !ready) return;
+    if (playing) {
+      audio.pause();
+    } else {
+      audio.play().catch((err) => console.warn("Audio play failed:", err));
+    }
+  };
+
+  const handleTimeUpdate = () => {
+    if (audioRef.current) {
+      setCurrentTime(audioRef.current.currentTime);
+    }
+  };
+
+  const handleLoadedMetadata = () => {
+    if (audioRef.current) {
+      setDuration(audioRef.current.duration || 0);
+      setReady(true);
+    }
+  };
+
+  const handleEnded = () => {
+    setPlaying(false);
+    setCurrentTime(0);
+    if (audioRef.current) {
+      audioRef.current.currentTime = 0;
+    }
+  };
+
+  const handleSeek = (e) => {
+    const time = parseFloat(e.target.value);
+    setCurrentTime(time);
+    if (audioRef.current) {
+      audioRef.current.currentTime = time;
+    }
   };
 
   return (
     <div className={`history-waveform-cell ${className}`.trim()}>
+      <audio
+        ref={audioRef}
+        src={audioUrl || undefined}
+        preload="metadata"
+        onPlay={() => setPlaying(true)}
+        onPause={() => setPlaying(false)}
+        onTimeUpdate={handleTimeUpdate}
+        onLoadedMetadata={handleLoadedMetadata}
+        onEnded={handleEnded}
+      />
       <button
         type="button"
         className="history-waveform-play-btn"
@@ -107,7 +115,22 @@ export default function WaveformInlinePlayer({
       >
         {playing ? <IconPause /> : <IconPlay />}
       </button>
-      <div className="history-waveform-track" ref={containerRef} />
+      <div className="history-waveform-track">
+        <input
+          type="range"
+          className="history-waveform-range"
+          min="0"
+          max={duration || 100}
+          value={currentTime}
+          onChange={handleSeek}
+          disabled={!ready}
+          style={{
+            width: "100%",
+            cursor: ready ? "pointer" : "default",
+            accentColor: progressColor,
+          }}
+        />
+      </div>
       {showTime && (
         <span className="history-waveform-time">
           {formatTimeShort(currentTime)} / {formatTimeShort(duration)}
@@ -116,3 +139,4 @@ export default function WaveformInlinePlayer({
     </div>
   );
 }
+

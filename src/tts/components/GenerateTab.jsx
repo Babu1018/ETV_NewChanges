@@ -204,7 +204,8 @@ export default function GenerateTab({
   const [audioEditSelection, setAudioEditSelection] = useState(null);
   const [audioDuration, setAudioDuration] = useState(0);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
-  const [correctionLayer, setCorrectionLayer] = useState(null);
+  const [correctionLayers, setCorrectionLayers] = useState([]);
+  const editingLayerIdRef = useRef(null);
   const [showRecordModal, setShowRecordModal] = useState(false);
   const [cloning, setCloning] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -426,7 +427,7 @@ export default function GenerateTab({
     setAudioEditMode(true);
     setAudioEditSelection(null);
     setAddMenuOpen(false);
-    setCorrectionLayer(null);
+    setCorrectionLayers([]);
     setError("");
     setSuccess(false);
     setSaved(false);
@@ -467,7 +468,7 @@ export default function GenerateTab({
     setAudioBlob(null);
     setAudioEditMode(false);
     setAudioEditSelection(null);
-    setCorrectionLayer(null);
+    setCorrectionLayers([]);
     setPreviousAudioBlob(null);
     if (undoTimerRef.current) {
       clearTimeout(undoTimerRef.current);
@@ -746,7 +747,7 @@ export default function GenerateTab({
     setAudioEditMode(false);
     setAudioEditSelection(null);
     setAddMenuOpen(false);
-    setCorrectionLayer(null);
+    setCorrectionLayers([]);
     setLoadedFromHistoryName("");
     activityLogIdRef.current = null;
     editRegionsRef.current = [];
@@ -797,11 +798,12 @@ export default function GenerateTab({
   const canShowAddMenu = Boolean(audioEditMode && audioEditSelection);
   const canGenerateFromScript = Boolean(text.trim());
 
-  const openCorrectionUpload = () => {
-    if (!audioEditSelection) {
+  const openCorrectionUpload = (layerId = null) => {
+    if (!layerId && !audioEditSelection) {
       setError("Select a region on the waveform first.");
       return;
     }
+    editingLayerIdRef.current = layerId;
     correctionFileInputRef.current?.click();
   };
 
@@ -809,33 +811,84 @@ export default function GenerateTab({
     const f = e.target.files?.[0];
     e.target.value = "";
     if (!f) return;
-    setCorrectionLayer({ fileName: f.name, blob: f });
-    setError("");
-    if (audioEditSelection) {
-      syncCorrectionAudio(f, f.name, audioEditSelection);
+    const layerId = editingLayerIdRef.current;
+    editingLayerIdRef.current = null;
+
+    if (layerId) {
+      setCorrectionLayers((prev) =>
+        prev.map((l) => (l.id === layerId ? { ...l, fileName: f.name, blob: f } : l))
+      );
+    } else {
+      const newLayer = {
+        id: Date.now() + Math.random(),
+        fileName: f.name,
+        blob: f,
+        selection: audioEditSelection,
+      };
+      setCorrectionLayers((prev) => [...prev, newLayer]);
     }
+    setError("");
   };
 
-  const openCorrectionRecord = () => {
-    if (!audioEditSelection) {
+  const openCorrectionRecord = (layerId = null) => {
+    if (!layerId && !audioEditSelection) {
       setError("Select a region on the waveform first.");
       return;
     }
+    editingLayerIdRef.current = layerId;
     setShowRecordModal(true);
   };
 
   const handleRecordSave = ({ blob, fileName }) => {
-    setCorrectionLayer({ fileName, blob });
-    setError("");
-    if (audioEditSelection) {
-      syncCorrectionAudio(blob, fileName, audioEditSelection);
+    const layerId = editingLayerIdRef.current;
+    editingLayerIdRef.current = null;
+
+    if (layerId) {
+      setCorrectionLayers((prev) =>
+        prev.map((l) => (l.id === layerId ? { ...l, fileName, blob } : l))
+      );
+    } else {
+      const newLayer = {
+        id: Date.now() + Math.random(),
+        fileName,
+        blob,
+        selection: audioEditSelection,
+      };
+      setCorrectionLayers((prev) => [...prev, newLayer]);
     }
+    setError("");
   };
 
-  const handleCloneCorrection = async () => {
-    if (!audioBlob || !correctionLayer || !audioEditSelection) {
+  const handleCloneCorrection = async (targetLayer) => {
+    const layerToClone = targetLayer || correctionLayers[correctionLayers.length - 1];
+    if (!audioBlob || !layerToClone) {
       setError("Select a region and add correction audio before cloning.");
       return;
+    }
+    const selection = layerToClone.selection || audioEditSelection;
+    if (!selection) {
+      setError("No edit region associated with this correction layer.");
+      return;
+    }
+    if (layerToClone.blob) {
+      try {
+        const audioUrl = URL.createObjectURL(layerToClone.blob);
+        const tempAudio = new Audio(audioUrl);
+        await new Promise((resolve) => {
+          tempAudio.onloadedmetadata = resolve;
+          tempAudio.onerror = resolve;
+        });
+        const dur = tempAudio.duration;
+        URL.revokeObjectURL(audioUrl);
+        if (dur && dur > 30) {
+          setError(
+            `Correction audio length is ${dur.toFixed(1)}s, which exceeds Sarvam AI's 30-second limit. Please upload or record a shorter clip (30s max).`
+          );
+          return;
+        }
+      } catch {
+        /* proceed if metadata check fails */
+      }
     }
     setCloning(true);
     setError("");
@@ -845,10 +898,10 @@ export default function GenerateTab({
       variant: "info",
     });
     try {
-      const { startSec, endSec } = audioEditSelection;
+      const { startSec, endSec } = selection;
       const result = await correctTtsSegment(apiBaseUrl, apiKey, {
         originalBlob: audioBlob,
-        correctionBlob: correctionLayer.blob,
+        correctionBlob: layerToClone.blob,
         startSec,
         endSec,
         language,
@@ -866,7 +919,11 @@ export default function GenerateTab({
       setAudioBlob(correctedBlob);
       setGeneratedFormat("wav");
       setExportFormat("wav");
-      setCorrectionLayer(null);
+      setCorrectionLayers((prev) => prev.filter((l) => l.id !== layerToClone.id));
+      setAudioEditSelection(null);
+      setAudioEditMode(false);
+      setAddMenuOpen(false);
+      setSuccess(true);
       setAudioEditSelection(null);
       setAudioEditMode(false);
       setAddMenuOpen(false);
@@ -946,7 +1003,7 @@ export default function GenerateTab({
       setExportFormat("wav");
       setAudioEditSelection(null);
       setAddMenuOpen(false);
-      setCorrectionLayer(null);
+      setCorrectionLayers([]);
       showToast({
         message: "Region deleted — audio updated. Use Undo to revert.",
         variant: "success",
@@ -1136,203 +1193,154 @@ export default function GenerateTab({
         </div>
       </section>
 
-      <section
-        ref={audioSectionRef}
-        className={`studio-glass studio-card studio-card-audio${correctionLayer ? " studio-card-audio--with-layer" : ""}`}
-      >
-        <header className="studio-card-head studio-card-head-split">
-          <h2 className="studio-card-title">Audio editor</h2>
-          <div className="studio-audio-toolbar">
-            <button
-              type="button"
-              className={`studio-icon-btn${audioBlob && audioEditMode ? " is-active" : ""}`}
-              title={
-                audioBlob
-                  ? audioEditMode
-                    ? "Exit audio edit mode"
-                    : "Edit audio — drag on the waveform to select a region"
-                  : "Edit script"
-              }
-              onClick={() => {
-                if (audioBlob) {
-                  setAudioEditMode((v) => {
-                    const next = !v;
-                    if (!next) {
-                      setAudioEditSelection(null);
-                      setAddMenuOpen(false);
-                      setCorrectionLayer(null);
-                    }
-                    return next;
-                  });
-                } else {
-                  focusScript();
+      <div className="studio-right-column">
+        <section
+          ref={audioSectionRef}
+          className={`studio-glass studio-card studio-card-audio${correctionLayers.length > 0 ? " studio-card-audio--with-layer" : ""}`}
+        >
+          <header className="studio-card-head studio-card-head-split">
+            <h2 className="studio-card-title">Audio editor</h2>
+            <div className="studio-audio-toolbar">
+              <button
+                type="button"
+                className={`studio-icon-btn${audioBlob && audioEditMode ? " is-active" : ""}`}
+                title={
+                  audioBlob
+                    ? audioEditMode
+                      ? "Exit audio edit mode"
+                      : "Edit audio — drag on the waveform to select a region"
+                    : "Edit script"
                 }
-              }}
-            >
-              <StudioIcon name="edit" size={18} />
-            </button>
-            <button
-              type="button"
-              className="studio-toolbar-btn"
-              disabled={!audioBlob}
-              onClick={openSaveModal}
-            >
-              <StudioIcon name="save" className="studio-toolbar-btn-icon" size={18} />
-              Save
-            </button>
-            {/* <div
-              ref={downloadFormatRef}
-              className={`studio-download-format${downloadMenuOpen ? " is-open" : ""}`}
-            >
+                onClick={() => {
+                  if (audioBlob) {
+                    setAudioEditMode((v) => {
+                      const next = !v;
+                      if (!next) {
+                        setAudioEditSelection(null);
+                        setAddMenuOpen(false);
+                        setCorrectionLayers([]);
+                      }
+                      return next;
+                    });
+                  } else {
+                    focusScript();
+                  }
+                }}
+              >
+                <StudioIcon name="edit" size={18} />
+              </button>
               <button
                 type="button"
-                className="studio-download-format-btn"
-                title={`Download ${exportFormat.toUpperCase()}`}
-                aria-label={`Download ${exportFormat.toUpperCase()}`}
-                disabled={!audioBlob || downloadingFormat !== null}
-                onClick={() => downloadAudio(exportFormat)}
+                className="studio-toolbar-btn"
+                disabled={!audioBlob}
+                onClick={openSaveModal}
               >
-                {downloadingFormat ? (
-                  <Spinner animation="border" size="sm" className="studio-format-spinner" />
-                ) : (
-                  <StudioIcon name="wav-mp3" className="studio-download-format-icon" size={16} />
-                )}
+                <StudioIcon name="save" className="studio-toolbar-btn-icon" size={18} />
+                Save
               </button>
-              <span className="studio-download-format-label" aria-hidden>
-                {exportFormat.toUpperCase()}
-              </span>
-              <button
-                type="button"
-                className="studio-download-format-toggle"
-                aria-label="Choose download format"
-                aria-haspopup="menu"
-                aria-expanded={downloadMenuOpen}
-                disabled={!audioBlob || downloadingFormat !== null}
-                onClick={() => setDownloadMenuOpen((v) => !v)}
-              >
-                <IconChevronDown />
-              </button>
-              {downloadMenuOpen && (
-                <div className="studio-download-format-menu" role="menu" aria-label="Download format">
-                  {["wav", "mp3"].map((fmt) => (
-                    <button
-                      key={fmt}
-                      type="button"
-                      role="menuitemradio"
-                      aria-checked={exportFormat === fmt}
-                      className={`studio-download-format-option${
-                        exportFormat === fmt ? " is-selected" : ""
-                      }`}
-                      onClick={() => {
-                        setExportFormat(fmt);
-                        setDownloadMenuOpen(false);
-                        downloadAudio(fmt);
-                      }}
-                    >
-                      {fmt.toUpperCase()}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div> */}
-          </div>
-        </header>
+            </div>
+          </header>
 
-        <div className="studio-card-body studio-card-body-audio">
-        {audioBlob && audioEditMode && (
-          <div className="studio-audio-edit-hint" role="status">
-            <span className="studio-audio-edit-hint-text">
-              {loadedFromHistoryName && !correctionLayer && (
-                <>
-                  Editing <strong>{loadedFromHistoryName}</strong> from History —{" "}
-                </>
-              )}
-              {correctionLayer
-                ? "Preview correction below, then click Clone to replace the selected region."
-                : "Select on the waveform. Click to hear a position, or drag to select. Use + to upload or record audio."}
-            </span>
-            {audioEditSelection && audioEditSelection.endSec > audioEditSelection.startSec && (
-              <SelectionRangeEditor
-                selection={audioEditSelection}
-                duration={audioDuration}
-                onChange={setAudioEditSelection}
-                onClear={() => setAudioEditSelection(null)}
-                onDelete={handleDeleteClip}
-                deleting={deleting}
-                canUndo={Boolean(previousAudioBlob)}
-                onUndo={handleUndoDelete}
-              />
-            )}
-            {!audioEditSelection && previousAudioBlob && (
-              <span className="studio-audio-edit-hint-actions">
-                <button
-                  type="button"
-                  className="studio-audio-edit-undo"
-                  title="Undo last deletion — restores the audio before the cut"
-                  onClick={handleUndoDelete}
-                >
-                  ↩ Undo delete
-                </button>
-              </span>
-            )}
-          </div>
-        )}
-        <div className="studio-preview-shell">
-          <div className="studio-preview-body">
-            {audioBlob ? (
-              <div className="studio-preview-audio">
-                <AudioPlayer
-                  blob={audioBlob}
-                  mimeType={audioMimeType(generatedFormat)}
-                  variant="studio"
-                  editMode={audioEditMode}
-                  selectionSec={audioEditSelection}
-                  onSelectionSecChange={setAudioEditSelection}
-                  onDurationChange={setAudioDuration}
-                  showAddMenu={canShowAddMenu}
-                  addMenuOpen={addMenuOpen}
-                  onAddMenuToggle={setAddMenuOpen}
-                  onAddMenuUpload={openCorrectionUpload}
-                  onAddMenuRecord={openCorrectionRecord}
-                />
+          <div className="studio-card-body studio-card-body-audio">
+            {audioBlob && audioEditMode && (
+              <div className="studio-audio-edit-hint" role="status">
+                <span className="studio-audio-edit-hint-text">
+                  {loadedFromHistoryName && correctionLayers.length === 0 && (
+                    <>
+                      Editing <strong>{loadedFromHistoryName}</strong> from History —{" "}
+                    </>
+                  )}
+                  {correctionLayers.length > 0
+                    ? "Preview correction below, then click Clone to replace the selected region."
+                    : "Select on the waveform. Click to hear a position, or drag to select. Use + to upload or record audio."}
+                </span>
+                {audioEditSelection && audioEditSelection.endSec > audioEditSelection.startSec && (
+                  <SelectionRangeEditor
+                    selection={audioEditSelection}
+                    duration={audioDuration}
+                    onChange={setAudioEditSelection}
+                    onClear={() => setAudioEditSelection(null)}
+                    onDelete={handleDeleteClip}
+                    deleting={deleting}
+                    canUndo={Boolean(previousAudioBlob)}
+                    onUndo={handleUndoDelete}
+                  />
+                )}
+                {!audioEditSelection && previousAudioBlob && (
+                  <span className="studio-audio-edit-hint-actions">
+                    <button
+                      type="button"
+                      className="studio-audio-edit-undo"
+                      title="Undo last deletion — restores the audio before the cut"
+                      onClick={handleUndoDelete}
+                    >
+                      ↩ Undo delete
+                    </button>
+                  </span>
+                )}
               </div>
-            ) : (
-              <>
-                <div className="studio-preview-empty">
-                  <p className="studio-preview-empty-title">No Preview Available</p>
-                  <p className="studio-preview-empty-sub">Choose</p>
-                </div>
-                <div className="studio-preview-uploads">
-                  <button type="button" className="studio-btn studio-btn-ghost" onClick={triggerTxtPick}>
-                    <StudioIcon name="upload" className="studio-btn-icon" size={18} />
-                    Upload txt File
-                  </button>
-                  <button
-                    type="button"
-                    className="studio-btn studio-btn-ghost"
-                    onClick={triggerAudioPick}
-                  >
-                    <StudioIcon name="upload" className="studio-btn-icon" size={18} />
-                    Upload Audio
-                  </button>
-                </div>
-              </>
             )}
+            <div className="studio-preview-shell">
+              <div className="studio-preview-body">
+                {audioBlob ? (
+                  <div className="studio-preview-audio">
+                    <AudioPlayer
+                      blob={audioBlob}
+                      mimeType={audioMimeType(generatedFormat)}
+                      variant="studio"
+                      editMode={audioEditMode}
+                      selectionSec={audioEditSelection}
+                      onSelectionSecChange={setAudioEditSelection}
+                      onDurationChange={setAudioDuration}
+                      showAddMenu={canShowAddMenu}
+                      addMenuOpen={addMenuOpen}
+                      onAddMenuToggle={setAddMenuOpen}
+                      onAddMenuUpload={openCorrectionUpload}
+                      onAddMenuRecord={openCorrectionRecord}
+                    />
+                  </div>
+                ) : (
+                  <>
+                    <div className="studio-preview-empty">
+                      <p className="studio-preview-empty-title">No Preview Available</p>
+                      <p className="studio-preview-empty-sub">Choose</p>
+                    </div>
+                    <div className="studio-preview-uploads">
+                      <button type="button" className="studio-btn studio-btn-ghost" onClick={triggerTxtPick}>
+                        <StudioIcon name="upload" className="studio-btn-icon" size={18} />
+                        Upload txt File
+                      </button>
+                      <button
+                        type="button"
+                        className="studio-btn studio-btn-ghost"
+                        onClick={triggerAudioPick}
+                      >
+                        <StudioIcon name="upload" className="studio-btn-icon" size={18} />
+                        Upload Audio
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
           </div>
-        </div>
-        {correctionLayer && (
-          <CorrectionLayerPanel
-            fileName={correctionLayer.fileName}
-            blob={correctionLayer.blob}
-            cloning={cloning}
-            onClone={handleCloneCorrection}
-            onDelete={() => setCorrectionLayer(null)}
-            onUpload={openCorrectionUpload}
-            onRecord={openCorrectionRecord}
-          />
-        )}
-        </div>
-      </section>
+        </section>
+
+        {correctionLayers.map((layer, index) => (
+          <section key={layer.id || index} className="studio-glass studio-card-correction">
+            <CorrectionLayerPanel
+              layerIndex={index + 1}
+              fileName={layer.fileName}
+              blob={layer.blob}
+              cloning={cloning}
+              onClone={() => handleCloneCorrection(layer)}
+              onDelete={() => setCorrectionLayers((prev) => prev.filter((l) => l.id !== layer.id))}
+              onUpload={() => openCorrectionUpload(layer.id)}
+              onRecord={() => openCorrectionRecord(layer.id)}
+            />
+          </section>
+        ))}
+      </div>
 
       <RecordCorrectionModal
         open={showRecordModal}

@@ -159,34 +159,9 @@ export default function AsrStudioApp({ onSignOut, onBackToHub }) {
         ? `Welcome, ${displayName}!`
         : "Welcome Validator!";
 
-  const handleOuterClick = (e) => {
-    if (
-      !e.target.isConnected ||
-      e.target.closest(".studio-card") ||
-      e.target.closest(".studio-nav") ||
-      e.target.closest(".history-section") ||
-      e.target.closest(".history-tab") ||
-      e.target.closest(".modal") ||
-      e.target.closest(".studio-save-modal") ||
-      e.target.closest(".studio-save-backdrop") ||
-      e.target.closest(".history-script-modal") ||
-      e.target.closest(".history-preview-modal") ||
-      e.target.closest(".history-confirm-modal") ||
-      e.target.closest(".studio-select-menu") ||
-      e.target.closest(".dropdown-menu") ||
-      e.target.closest(".studio-profile-menu") ||
-      e.target.closest(".studio-toast") ||
-      e.target.closest(".studio-toast-stack") ||
-      e.target.closest(".modal-dialog")
-    ) {
-      return;
-    }
-    onBackToHub();
-  };
-
   return (
     <StudioToastProvider>
-      <div className="app-studio studio-fixed-layout" onClick={handleOuterClick}>
+      <div className="app-studio studio-fixed-layout">
         <div className="app-studio-bg" aria-hidden />
         <div className="app-studio-inner">
           <header className="studio-nav glass-nav">

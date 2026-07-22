@@ -48,14 +48,17 @@ export async function correctTtsSegment(apiBaseUrl, apiKey, {
   });
   if (!res.ok) {
     const t = await res.text();
-    let message = t || `Correction failed (${res.status})`;
+    let message = `Correction failed (${res.status})`;
     try {
       const parsed = JSON.parse(t);
-      if (parsed.detail) {
-        message = typeof parsed.detail === "string" ? parsed.detail : JSON.stringify(parsed.detail);
-      }
+      const rawDetail = parsed.detail || parsed.message || t;
+      message = typeof rawDetail === "string" ? rawDetail : JSON.stringify(rawDetail);
     } catch {
-      /* plain text body */
+      message = t || message;
+    }
+    const match = message.match(/['"]message['"]\s*:\s*['"]([^'"]+)['"]/i);
+    if (match && match[1]) {
+      message = match[1];
     }
     throw new Error(message);
   }

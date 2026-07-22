@@ -302,12 +302,9 @@ function LogsDeleteConfirmModal({ count, deleting, onCancel, onConfirm }) {
   );
 }
 
-function LogAudioCell({ entry, onDownload, downloadingId }) {
+function LogAudioCell({ entry }) {
   const [src, setSrc] = useState(null);
   const [err, setErr] = useState("");
-  const isDownloading = downloadingId === entry.id;
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef(null);
 
   useEffect(() => {
     let url;
@@ -341,17 +338,6 @@ function LogAudioCell({ entry, onDownload, downloadingId }) {
     };
   }, [entry.id, entry.type]);
 
-  useEffect(() => {
-    if (!open) return undefined;
-    const onDoc = (e) => {
-      if (rootRef.current && !rootRef.current.contains(e.target)) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, [open]);
-
   if (err) return <span className="history-audio-error">{err}</span>;
   if (!src) {
     return (
@@ -362,83 +348,9 @@ function LogAudioCell({ entry, onDownload, downloadingId }) {
     );
   }
 
-  const handleOptionClick = (kind) => {
-    setOpen(false);
-    onDownload(entry, kind);
-  };
-
-  const mime = entry.mimeType || audioMimeType(normalizeAudioFormat(entry.audioFormat));
   return (
-    <div className="logs-audio-cell" ref={rootRef} style={{ position: "relative" }}>
+    <div className="logs-audio-cell">
       <WaveformInlinePlayer src={src} className="logs-inline-audio" />
-      <button
-        type="button"
-        className="logs-download-btn"
-        title="Download options"
-        aria-label={`Download options for ${entry.fileName || "entry"}`}
-        disabled={isDownloading}
-        onClick={() => setOpen((v) => !v)}
-      >
-        {isDownloading ? <Spinner animation="border" size="sm" /> : <IconDownload />}
-      </button>
-
-      {open && (
-        <div
-          className="history-download-format-menu"
-          role="menu"
-          style={{
-            position: "absolute",
-            top: "calc(100% + 4px)",
-            right: 0,
-            width: "180px",
-            minWidth: "180px",
-            maxWidth: "180px",
-            background: "#ffffff",
-            border: "1px solid #c7d9fb",
-            borderRadius: "10px",
-            boxShadow: "0 8px 24px rgba(15, 23, 42, 0.12)",
-            padding: "0.25rem",
-            zIndex: 1000
-          }}
-        >
-          <button
-            type="button"
-            role="menuitem"
-            className="history-download-format-option"
-            style={{ textAlign: "left", width: "100%" }}
-            onClick={() => handleOptionClick("audio")}
-          >
-            Audio File (.wav)
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            className="history-download-format-option"
-            style={{ textAlign: "left", width: "100%" }}
-            onClick={() => handleOptionClick("excel")}
-          >
-            Excel Summary (.xlsx)
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            className="history-download-format-option"
-            style={{ textAlign: "left", width: "100%" }}
-            onClick={() => handleOptionClick("json")}
-          >
-            JSON Details (.json)
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            className="history-download-format-option"
-            style={{ textAlign: "left", width: "100%" }}
-            onClick={() => handleOptionClick("bundle")}
-          >
-            ZIP Bundle (All Files)
-          </button>
-        </div>
-      )}
     </div>
   );
 }
